@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BILLING_ENTITIES } from '@/lib/billing-entities'
 
 interface Store {
   id: string
@@ -46,6 +47,19 @@ function parseTags(input: string) {
     .filter(t => t.length > 0)
 }
 
+function defaultStartsAt() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return formatDateTimeLocal(d.toISOString())
+}
+
+function defaultEndsAt() {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() + 1, 11, 31)
+  d.setHours(23, 59, 0, 0)
+  return formatDateTimeLocal(d.toISOString())
+}
+
 export default function Dashboard() {
   const [stores, setStores] = useState<Store[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -53,21 +67,28 @@ export default function Dashboard() {
   const [newShop, setNewShop] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [rulesOpen, setRulesOpen] = useState<string | null>(null)
+  const [storesOpen, setStoresOpen] = useState(false)
 
-  const [form, setForm] = useState({
+  const defaultFormState = () => ({
     title: '',
     discountType: 'percentage',
     discountValue: '',
     minimumOrderAmount: '',
-    startsAt: '',
-    endsAt: '',
+    startsAt: defaultStartsAt(),
+    endsAt: defaultEndsAt(),
     customerSelection: 'all',
     singleItem: false,
-    excludedTags: '',
+    advanced: false,
+    excludedTags: 'gift_card',
+    billingEntity: 'rocky-boots',
+    codeCount: 1,
+    customCodes: false,
     codeInput: '',
     generatePrefix: '',
     generateCount: 10,
   })
+
+  const [form, setForm] = useState(defaultFormState)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingForm, setEditingForm] = useState<any>(null)
@@ -139,10 +160,29 @@ export default function Dashboard() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    const codes = buildCodes()
-    if (codes.length === 0) {
-      alert('Please provide at least one discount code or generate codes')
-      return
+
+    const payload: any = {
+      title: form.title,
+      discountType: form.discountType,
+      discountValue: parseFloat(form.discountValue),
+      minimumOrderAmount: form.minimumOrderAmount ? parseFloat(form.minimumOrderAmount) : undefined,
+      startsAt: toIsoString(form.startsAt),
+      endsAt: toIsoString(form.endsAt),
+      customerSelection: form.customerSelection,
+      singleItem: form.singleItem,
+      excludedTags: parseTags(form.excludedTags),
+    }
+
+    if (form.customCodes) {
+      const codes = buildCodes()
+      if (codes.length === 0) {
+        alert('Please provide at least one discount code or generate codes')
+        return
+      }
+      payload.codes = codes
+    } else {
+      payload.billingEntity = form.billingEntity
+      payload.codeCount = form.codeCount
     }
 
     setLoading(true)
@@ -150,36 +190,15 @@ export default function Dashboard() {
       const res = await fetch('/api/discount-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          discountType: form.discountType,
-          discountValue: parseFloat(form.discountValue),
-          minimumOrderAmount: form.minimumOrderAmount ? parseFloat(form.minimumOrderAmount) : undefined,
-          startsAt: toIsoString(form.startsAt),
-          endsAt: toIsoString(form.endsAt),
-          customerSelection: form.customerSelection,
-          singleItem: form.singleItem,
-          excludedTags: parseTags(form.excludedTags),
-          codes,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create group')
-      alert('Discount group created')
-      setForm({
-        title: '',
-        discountType: 'percentage',
-        discountValue: '',
-        minimumOrderAmount: '',
-        startsAt: '',
-        endsAt: '',
-        customerSelection: 'all',
-        singleItem: false,
-        excludedTags: '',
-        codeInput: '',
-        generatePrefix: '',
-        generateCount: 10,
-      })
+      const generated = data.group?.codes?.map((c: any) => c.code) || []
+      alert(generated.length
+        ? `Discount group created with ${generated.length} code${generated.length === 1 ? '' : 's'}: ${generated.slice(0, 5).join(', ')}${generated.length > 5 ? ` (+${generated.length - 5} more)` : ''}`
+        : 'Discount group created')
+      setForm(defaultFormState())
       await loadData()
     } catch (err: any) {
       alert(err.message)
@@ -295,7 +314,11 @@ export default function Dashboard() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to add codes')
-      alert(`${data.added?.length || 0} codes added, ${data.skipped?.length || 0} skipped`)
+      alert(
+        data.mode === 'remove'
+          ? `${data.removed?.length || 0} codes removed${data.missing?.length ? `, ${data.missing.length} not found` : ''}`
+          : `${data.added?.length || 0} codes added, ${data.skipped?.length || 0} skipped`
+      )
       setActiveGroup(null)
       setActiveForm({ codeInput: '', generatePrefix: '', generateCount: 10, mode: 'add' })
       await loadData()
@@ -315,8 +338,14 @@ export default function Dashboard() {
 
       <section className="card mb-4">
         <div className="card-header">
-          <h2 className="h5 mb-0">Shopify Stores</h2>
+          <button
+            className="btn btn-link p-0 text-decoration-none text-dark w-100 text-start"
+            onClick={() => setStoresOpen(!storesOpen)}
+          >
+            <h2 className="h5 mb-0">{storesOpen ? '▾' : '▸'} Shopify Stores</h2>
+          </button>
         </div>
+        {storesOpen && (
         <div className="card-body">
           {stores.length === 0 && (
             <div className="alert alert-warning">No stores connected. Add a store below to get started.</div>
@@ -368,6 +397,7 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+        )}
       </section>
 
       <section className="card mb-4">
@@ -376,6 +406,49 @@ export default function Dashboard() {
         </div>
         <div className="card-body">
           <form onSubmit={handleCreate}>
+            <div className="row g-3 mb-3">
+              <div className="col-md-4">
+                <label className="form-label">Billing Entity</label>
+                <select
+                  className="form-select"
+                  value={form.billingEntity}
+                  disabled={form.customCodes}
+                  onChange={(e) => setForm({ ...form, billingEntity: e.target.value })}
+                >
+                  {BILLING_ENTITIES.map(entity => (
+                    <option key={entity.id} value={entity.id}>{entity.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-3">
+                <label className="form-label">Number of Codes</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  min="1"
+                  max="1000"
+                  value={form.codeCount}
+                  disabled={form.customCodes}
+                  onChange={(e) => setForm({ ...form, codeCount: parseInt(e.target.value) || 1 })}
+                />
+              </div>
+              <div className="col-md-4">
+                <label className="form-label">&nbsp;</label>
+                <div className="form-check">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="customCodes"
+                    checked={form.customCodes}
+                    onChange={(e) => setForm({ ...form, customCodes: e.target.checked })}
+                  />
+                  <label className="form-check-label" htmlFor="customCodes">
+                    Custom codes (paste or auto-generate)
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div className="row g-3 mb-3">
               <div className="col-md-6">
                 <label className="form-label">Group Title (admin name)</label>
@@ -432,35 +505,19 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="col-md-3">
-                <label className="form-label">Excluded Product Tags</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={form.excludedTags}
-                  onChange={(e) => setForm({ ...form, excludedTags: e.target.value })}
-                  placeholder="e.g. no-discount, clearance"
-                />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Minimum Order ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-control"
-                  value={form.minimumOrderAmount}
-                  onChange={(e) => setForm({ ...form, minimumOrderAmount: e.target.value })}
-                />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Customer Selection</label>
-                <select
-                  className="form-select"
-                  value={form.customerSelection}
-                  onChange={(e) => setForm({ ...form, customerSelection: e.target.value })}
-                >
-                  <option value="all">All Customers</option>
-                  <option value="prerequisite">Specific Customers</option>
-                </select>
+                <label className="form-label">Advanced</label>
+                <div className="form-check mt-2">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="advanced"
+                    checked={form.advanced}
+                    onChange={(e) => setForm({ ...form, advanced: e.target.checked })}
+                  />
+                  <label className="form-check-label" htmlFor="advanced">
+                    Show advanced options
+                  </label>
+                </div>
               </div>
               <div className="col-md-3">
                 <label className="form-label">Start Date</label>
@@ -482,39 +539,77 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="row g-3 mb-3">
-              <div className="col-md-6">
-                <label className="form-label">Codes (one per line or comma-separated)</label>
-                <textarea
-                  className="form-control"
-                  rows={4}
-                  value={form.codeInput}
-                  onChange={(e) => setForm({ ...form, codeInput: e.target.value })}
-                  placeholder="CODE1, CODE2, CODE3"
-                />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Or Auto-Generate</label>
-                <div className="input-group mb-2">
+            {form.advanced && (
+              <div className="row g-3 mb-3">
+                <div className="col-md-4">
+                  <label className="form-label">Excluded Product Tags</label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Prefix"
-                    value={form.generatePrefix}
-                    onChange={(e) => setForm({ ...form, generatePrefix: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    className="form-control"
-                    min="1"
-                    max="1000"
-                    value={form.generateCount}
-                    onChange={(e) => setForm({ ...form, generateCount: parseInt(e.target.value) || 0 })}
+                    value={form.excludedTags}
+                    onChange={(e) => setForm({ ...form, excludedTags: e.target.value })}
+                    placeholder="e.g. no-discount, clearance"
                   />
                 </div>
-                <div className="form-text">Paste a list of codes OR fill prefix/count. Max 1000.</div>
+                <div className="col-md-4">
+                  <label className="form-label">Minimum Order ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    value={form.minimumOrderAmount}
+                    onChange={(e) => setForm({ ...form, minimumOrderAmount: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Customer Selection</label>
+                  <select
+                    className="form-select"
+                    value={form.customerSelection}
+                    onChange={(e) => setForm({ ...form, customerSelection: e.target.value })}
+                  >
+                    <option value="all">All Customers</option>
+                    <option value="prerequisite">Specific Customers</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
+
+            {form.customCodes && (
+              <div className="row g-3 mb-3">
+                <div className="col-md-6">
+                  <label className="form-label">Codes (one per line or comma-separated)</label>
+                  <textarea
+                    className="form-control"
+                    rows={4}
+                    value={form.codeInput}
+                    onChange={(e) => setForm({ ...form, codeInput: e.target.value })}
+                    placeholder="CODE1, CODE2, CODE3"
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Or Auto-Generate</label>
+                  <div className="input-group mb-2">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Prefix"
+                      value={form.generatePrefix}
+                      onChange={(e) => setForm({ ...form, generatePrefix: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      className="form-control"
+                      min="1"
+                      max="1000"
+                      value={form.generateCount}
+                      onChange={(e) => setForm({ ...form, generateCount: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="form-text">Paste a list of codes OR fill prefix/count. Max 1000.</div>
+                </div>
+              </div>
+            )}
 
             <button className="btn btn-primary" type="submit" disabled={loading}>
               {loading ? 'Creating...' : 'Create Discount Group'}
@@ -690,7 +785,11 @@ export default function Dashboard() {
                 <form onSubmit={handleAddCodes} className="mt-3 border-top pt-3">
                   <div className="row g-3 mb-3">
                     <div className="col-md-5">
-                      <label className="form-label">Codes to Add (one per line or comma-separated)</label>
+                      <label className="form-label">
+                        {activeForm.mode === 'remove'
+                          ? 'Codes to Remove (one per line or comma-separated)'
+                          : 'Codes to Add (one per line or comma-separated)'}
+                      </label>
                       <textarea
                         className="form-control"
                         rows={3}
@@ -729,6 +828,7 @@ export default function Dashboard() {
                         <option value="add">Add only new</option>
                         <option value="replace">Replace all (override)</option>
                         <option value="block">Skip used</option>
+                        <option value="remove">Remove (delete from all stores)</option>
                       </select>
                     </div>
                   </div>

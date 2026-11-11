@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { serviceForShop } from '@/lib/shopify-session'
 import { getSessionOr401 } from '@/lib/session-token'
+import { billingEntityById } from '@/lib/billing-entities'
+import { generateUniqueEntityCodes } from '@/lib/code-generator'
 import { DiscountCodeRequest } from '@/lib/types'
 
 function generateCodes(prefix: string, count: number) {
@@ -92,7 +94,18 @@ export async function POST(request: NextRequest) {
     }
 
     let codes: string[] = []
-    if (Array.isArray(body.codes)) {
+    if (typeof body.billingEntity === 'string' && body.billingEntity) {
+      const entity = billingEntityById(body.billingEntity)
+      if (!entity) {
+        return NextResponse.json({ error: 'Unknown billing entity' }, { status: 400 })
+      }
+      const count = typeof body.codeCount === 'number' ? Math.floor(body.codeCount) : 1
+      if (count < 1 || count > 1000) {
+        return NextResponse.json({ error: 'codeCount must be between 1 and 1000' }, { status: 400 })
+      }
+      const endYear = endsAt ? new Date(endsAt).getFullYear() : new Date().getFullYear()
+      codes = await generateUniqueEntityCodes(entity.prefix, endYear, count)
+    } else if (Array.isArray(body.codes)) {
       codes = normalizeCodes(body.codes)
     } else if (body.generate && typeof body.generate.prefix === 'string' && typeof body.generate.count === 'number') {
       codes = generateCodes(body.generate.prefix, body.generate.count)

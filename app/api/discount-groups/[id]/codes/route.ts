@@ -66,7 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Maximum 1000 codes allowed per operation' }, { status: 400 })
     }
 
-    const existingCodes = new Set(group.codes.map(c => c.code.toUpperCase()))
+    const existingCodes = new Set(group.codes.filter(c => !c.deletedAt).map(c => c.code.toUpperCase()))
     const usedCodes = new Set(group.codes.filter(c => c.redeemedAt).map(c => c.code.toUpperCase()))
 
     if (mode === 'replace') {
@@ -116,6 +116,42 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ mode: 'replace', codes: newCodes, storeResults })
     }
 
+    if (mode === 'remove') {
+      const activeCodes = new Set(
+        group.codes.filter(c => !c.deletedAt).map(c => c.code.toUpperCase())
+      )
+      const toRemove = newCodes.filter(c => activeCodes.has(c))
+      const missing = newCodes.filter(c => !activeCodes.has(c))
+
+      const storeResults = []
+      for (const shopDiscount of group.shopDiscounts) {
+        const service = serviceForShop(shopDiscount.shop)
+        const failures: { code: string; error: string }[] = []
+        for (const code of toRemove) {
+          try {
+            await service.removeRedeemCode(shopDiscount.shopifyDiscountId, code)
+          } catch (err) {
+            console.error(`Failed to remove ${code} on ${shopDiscount.shop.shopDomain}:`, err)
+            failures.push({ code, error: (err as Error).message })
+          }
+        }
+        storeResults.push({
+          shop: shopDiscount.shop.shopDomain,
+          success: failures.length === 0,
+          errors: failures.length ? failures : undefined,
+        })
+      }
+
+      if (toRemove.length > 0) {
+        await prisma.discountCode.updateMany({
+          where: { discountGroupId: group.id, code: { in: toRemove } },
+          data: { deletedAt: new Date() },
+        })
+      }
+
+      return NextResponse.json({ mode: 'remove', removed: toRemove, missing, storeResults })
+    }
+
     // add or block
     const toAdd: string[] = []
     for (const code of newCodes) {
@@ -145,6 +181,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       await prisma.discountCode.createMany({
         data: toAdd.map(code => ({ discountGroupId: group.id, code })),
         skipDuplicates: true,
+      })
+      // Resurrect codes that were previously soft-deleted
+      await prisma.discountCode.updateMany({
+        where: { discountGroupId: group.id, code: { in: toAdd }, deletedAt: { not: null } },
+        data: { deletedAt: null },
       })
     }
 
