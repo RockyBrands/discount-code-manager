@@ -77,7 +77,7 @@ export default function Dashboard() {
     startsAt: defaultStartsAt(),
     endsAt: defaultEndsAt(),
     customerSelection: 'all',
-    singleItem: false,
+    singleItem: true,
     advanced: false,
     excludedTags: 'gift_card',
     billingEntity: 'rocky-boots',
@@ -407,6 +407,19 @@ export default function Dashboard() {
         <div className="card-body">
           <form onSubmit={handleCreate}>
             <div className="row g-3 mb-3">
+              <div className="col-12">
+                <label className="form-label">Discount Group Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="row g-3 mb-3">
               <div className="col-md-4">
                 <label className="form-label">Billing Entity</label>
                 <select
@@ -432,46 +445,25 @@ export default function Dashboard() {
                   onChange={(e) => setForm({ ...form, codeCount: parseInt(e.target.value) || 1 })}
                 />
               </div>
-              <div className="col-md-4">
-                <label className="form-label">&nbsp;</label>
-                <div className="form-check">
-                  <input
-                    type="checkbox"
-                    className="form-check-input"
-                    id="customCodes"
-                    checked={form.customCodes}
-                    onChange={(e) => setForm({ ...form, customCodes: e.target.checked })}
-                  />
-                  <label className="form-check-label" htmlFor="customCodes">
-                    Custom codes (paste or auto-generate)
-                  </label>
-                </div>
-              </div>
             </div>
 
             <div className="row g-3 mb-3">
-              <div className="col-md-6">
-                <label className="form-label">Group Title (admin name)</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="col-md-3">
+              <div className="col-md-4">
                 <label className="form-label">Type</label>
                 <select
                   className="form-select"
                   value={form.discountType}
-                  onChange={(e) => setForm({ ...form, discountType: e.target.value })}
+                  onChange={(e) => setForm({
+                    ...form,
+                    discountType: e.target.value,
+                    singleItem: e.target.value === 'percentage' ? form.singleItem : false,
+                  })}
                 >
                   <option value="percentage">Percent off</option>
                   <option value="fixed_amount">Amount off</option>
                 </select>
               </div>
-              <div className="col-md-3">
+              <div className="col-md-4">
                 <label className="form-label">{form.discountType === 'percentage' ? 'Percent (%)' : 'Amount ($)'}</label>
                 <input
                   type="number"
@@ -485,9 +477,91 @@ export default function Dashboard() {
             </div>
 
             <div className="row g-3 mb-3">
-              <div className="col-md-3">
-                <label className="form-label">Single Item Mode</label>
-                <div className="form-check mt-2">
+              <div className="col-md-6">
+                <label className="form-label">Start Date</label>
+                <input
+                  type="datetime-local"
+                  className="form-control"
+                  value={form.startsAt}
+                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">End Date</label>
+                <input
+                  type="datetime-local"
+                  className="form-control"
+                  value={form.endsAt}
+                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="form-check mb-3">
+              <input
+                type="checkbox"
+                className="form-check-input"
+                id="advanced"
+                checked={form.advanced}
+                onChange={(e) => setForm({ ...form, advanced: e.target.checked })}
+              />
+              <label className="form-check-label" htmlFor="advanced">
+                Show advanced options
+              </label>
+            </div>
+
+            {form.advanced && (
+              <div className="border rounded p-3 mb-3 bg-light">
+                <div className="form-check mb-3">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="customCodes"
+                    checked={form.customCodes}
+                    onChange={(e) => setForm({ ...form, customCodes: e.target.checked })}
+                  />
+                  <label className="form-check-label" htmlFor="customCodes">
+                    Custom Codes (paste or auto-generate)
+                  </label>
+                </div>
+
+                {form.customCodes && (
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
+                      <label className="form-label">Codes (one per line or comma-separated)</label>
+                      <textarea
+                        className="form-control"
+                        rows={4}
+                        value={form.codeInput}
+                        onChange={(e) => setForm({ ...form, codeInput: e.target.value })}
+                        placeholder="CODE1, CODE2, CODE3"
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label">Or Auto-Generate</label>
+                      <div className="input-group mb-2">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Prefix"
+                          value={form.generatePrefix}
+                          onChange={(e) => setForm({ ...form, generatePrefix: e.target.value })}
+                        />
+                        <input
+                          type="number"
+                          className="form-control"
+                          min="1"
+                          max="1000"
+                          value={form.generateCount}
+                          onChange={(e) => setForm({ ...form, generateCount: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                      <div className="form-text">Paste a list of codes OR fill prefix/count. Max 1000.</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-check mb-3">
                   <input
                     type="checkbox"
                     className="form-check-input"
@@ -499,121 +573,59 @@ export default function Dashboard() {
                   <label className="form-check-label" htmlFor="singleItem">
                     % off one item only
                   </label>
+                  {form.discountType !== 'percentage' && (
+                    <div className="form-text">Requires percent off</div>
+                  )}
                 </div>
-                {form.discountType !== 'percentage' && (
-                  <div className="form-text">Requires percent off</div>
-                )}
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Advanced</label>
-                <div className="form-check mt-2">
-                  <input
-                    type="checkbox"
-                    className="form-check-input"
-                    id="advanced"
-                    checked={form.advanced}
-                    onChange={(e) => setForm({ ...form, advanced: e.target.checked })}
-                  />
-                  <label className="form-check-label" htmlFor="advanced">
-                    Show advanced options
-                  </label>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">Start Date</label>
-                <input
-                  type="datetime-local"
-                  className="form-control"
-                  value={form.startsAt}
-                  onChange={(e) => setForm({ ...form, startsAt: e.target.value })}
-                />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">End Date</label>
-                <input
-                  type="datetime-local"
-                  className="form-control"
-                  value={form.endsAt}
-                  onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-                />
-              </div>
-            </div>
 
-            {form.advanced && (
-              <div className="row g-3 mb-3">
-                <div className="col-md-4">
-                  <label className="form-label">Excluded Product Tags</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.excludedTags}
-                    onChange={(e) => setForm({ ...form, excludedTags: e.target.value })}
-                    placeholder="e.g. no-discount, clearance"
-                  />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label">Minimum Order ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={form.minimumOrderAmount}
-                    onChange={(e) => setForm({ ...form, minimumOrderAmount: e.target.value })}
-                  />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label">Customer Selection</label>
-                  <select
-                    className="form-select"
-                    value={form.customerSelection}
-                    onChange={(e) => setForm({ ...form, customerSelection: e.target.value })}
-                  >
-                    <option value="all">All Customers</option>
-                    <option value="prerequisite">Specific Customers</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {form.customCodes && (
-              <div className="row g-3 mb-3">
-                <div className="col-md-6">
-                  <label className="form-label">Codes (one per line or comma-separated)</label>
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={form.codeInput}
-                    onChange={(e) => setForm({ ...form, codeInput: e.target.value })}
-                    placeholder="CODE1, CODE2, CODE3"
-                  />
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label">Or Auto-Generate</label>
-                  <div className="input-group mb-2">
+                <div className="row g-3">
+                  <div className="col-md-4">
+                    <label className="form-label">Excluded Product Tags</label>
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Prefix"
-                      value={form.generatePrefix}
-                      onChange={(e) => setForm({ ...form, generatePrefix: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      className="form-control"
-                      min="1"
-                      max="1000"
-                      value={form.generateCount}
-                      onChange={(e) => setForm({ ...form, generateCount: parseInt(e.target.value) || 0 })}
+                      value={form.excludedTags}
+                      onChange={(e) => setForm({ ...form, excludedTags: e.target.value })}
+                      placeholder="e.g. no-discount, clearance"
                     />
                   </div>
-                  <div className="form-text">Paste a list of codes OR fill prefix/count. Max 1000.</div>
+                  <div className="col-md-4">
+                    <label className="form-label">Minimum Order ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={form.minimumOrderAmount}
+                      onChange={(e) => setForm({ ...form, minimumOrderAmount: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Customer Selection</label>
+                    <select
+                      className="form-select"
+                      value={form.customerSelection}
+                      onChange={(e) => setForm({ ...form, customerSelection: e.target.value })}
+                    >
+                      <option value="all">All Customers</option>
+                      <option value="prerequisite">Specific Customers</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             )}
 
-            <button className="btn btn-primary" type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Discount Group'}
-            </button>
+            <div className="d-flex align-items-center gap-3">
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? 'Creating...' : 'Create Discount Group'}
+              </button>
+              {!form.customCodes && (
+                <span className="text-muted small">
+                  e.g. {BILLING_ENTITIES.find(e => e.id === form.billingEntity)?.prefix ?? '??'}
+                  {'XXXXXXXX'}
+                  {String((form.endsAt ? new Date(form.endsAt) : new Date()).getFullYear() % 100).padStart(2, '0')}
+                </span>
+              )}
+            </div>
           </form>
         </div>
       </section>
