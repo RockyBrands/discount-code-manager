@@ -1,5 +1,11 @@
 [build]
   command = "prisma migrate deploy && prisma generate && npm run build"
+
+[build.environment]
+  # SHOPIFY_API_KEY is a public client ID — App Bridge requires it rendered in
+  # the page (shopify-api-key meta tag), so it intentionally appears in build
+  # output. Only the client secret must stay private.
+  SECRETS_SCAN_OMIT_KEYS = "SHOPIFY_API_KEY"
   publish = ".next"
 
 [[plugins]]
