@@ -1,0 +1,72 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "cost": {
+          "subtotalAmount": { "amount": "130.0" }
+        },
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/1",
+            "quantity": 1,
+            "cost": {
+              "amountPerQuantity": { "amount": "100.0" },
+              "subtotalAmount": { "amount": "100.0" }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "product": { "id": "gid://shopify/Product/1", "hasAnyTag": false, "inAnyCollection": true }
+            }
+          },
+          {
+            "id": "gid://shopify/CartLine/2",
+            "quantity": 2,
+            "cost": {
+              "amountPerQuantity": { "amount": "15.0" },
+              "subtotalAmount": { "amount": "30.0" }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "product": { "id": "gid://shopify/Product/2", "hasAnyTag": false, "inAnyCollection": true }
+            }
+          }
+        ]
+      },
+      "discount": {
+        "discountClasses": ["PRODUCT"],
+        "metafield": {
+          "value": "{\"percentage\":50,\"excludedTags\":[\"no-discount\"],\"collectionIds\":[\"gid://shopify/Collection/9\"],\"minimumSubtotal\":0}"
+        }
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "productDiscountsAdd": {
+            "candidates": [
+              {
+                "message": "50% OFF ONE ITEM",
+                "targets": [
+                  {
+                    "cartLine": {
+                      "id": "gid://shopify/CartLine/1",
+                      "quantity": 1
+                    }
+                  }
+                ],
+                "value": {
+                  "percentage": {
+                    "value": 50.0
+                  }
+                }
+              }
+            ],
+            "selectionStrategy": "FIRST"
+          }
+        }
+      ]
+    }
+  }
+}

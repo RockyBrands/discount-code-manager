@@ -22,12 +22,6 @@ export const DEPARTMENTS: Department[] = [
   { id: 'cs', name: 'Customer Service', prefix: 'CS', displayName: 'Customer Service (CS)' },
 ]
 
-export const ALLOWED_DOMAINS = [
-  'rockybrands.com',
-  'lehigh.com',
-  'lehighoutfitters.com'
-]
-
 export const DISCOUNT_TYPES = [
   { value: 'percentage', label: 'Percentage' },
   { value: 'fixed_amount', label: 'Fixed Amount' },

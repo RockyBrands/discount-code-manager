@@ -1,0 +1,4 @@
+{
+  "name": "Single Item Discount",
+  "description": "Applies a percentage discount to a single item in the cart, excluding products with configured tags"
+}

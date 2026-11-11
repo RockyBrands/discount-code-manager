@@ -1,0 +1,89 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NETLIFY_DB_URL")
+}
+
+model Shop {
+  id                    String         @id @default(cuid())
+  shopDomain            String         @unique
+  accessToken           String
+  scope                 String?
+  label                 String?
+  collectionId          String?
+  webhookSubscriptionId String?
+  uninstalledAt         DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  shopDiscounts         ShopDiscount[]
+}
+
+model DiscountGroup {
+  id                     String         @id @default(cuid())
+  title                  String
+  discountType           String
+  discountValue          Float
+  singleItem             Boolean        @default(false)
+  excludedTags           String[]       @default([])
+  minimumOrderAmount     Float?
+  usageLimit             Int?           @default(1)
+  appliesOncePerCustomer Boolean        @default(false)
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  customerSelection      String         @default("all")
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  shopDiscounts          ShopDiscount[]
+  codes                  DiscountCode[]
+}
+
+model ShopDiscount {
+  id                String           @id @default(cuid())
+  discountGroupId   String
+  shopId            String
+  shopifyDiscountId String
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  discountGroup     DiscountGroup    @relation(fields: [discountGroupId], references: [id], onDelete: Cascade)
+  shop              Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  removalJobs       CodeRemovalJob[]
+
+  @@unique([discountGroupId, shopId])
+}
+
+model DiscountCode {
+  id               String           @id @default(cuid())
+  discountGroupId  String
+  code             String
+  redeemedAt       DateTime?
+  redeemedOnShopId String?
+  redeemedOrderId  String?
+  deletedAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  discountGroup    DiscountGroup    @relation(fields: [discountGroupId], references: [id], onDelete: Cascade)
+  removalJobs      CodeRemovalJob[]
+
+  @@unique([discountGroupId, code])
+  @@index([code])
+}
+
+model CodeRemovalJob {
+  id             String       @id @default(cuid())
+  discountCodeId String
+  shopDiscountId String
+  status         String       @default("pending")
+  attempts       Int          @default(0)
+  lastError      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  discountCode   DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+  shopDiscount   ShopDiscount @relation(fields: [shopDiscountId], references: [id], onDelete: Cascade)
+
+  @@unique([discountCodeId, shopDiscountId])
+  @@index([status])
+}

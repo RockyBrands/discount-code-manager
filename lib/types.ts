@@ -60,24 +60,28 @@ export interface ShopifyCollection {
 }
 
 export interface DiscountCodeRequest {
-  code: string
+  code?: string
   discountType: 'percentage' | 'fixed_amount' | 'free_shipping'
   discountValue: number
+  minimumOrderAmount?: number
+  usageLimit?: number
+  usageLimitPerCustomer?: number
+  startsAt?: string
+  endsAt?: string
+  appliesTo?: 'all' | 'product' | 'collection'
+  customerSelection?: 'all' | 'prerequisite'
   combinesWith?: {
     orderDiscounts: boolean
     productDiscounts: boolean
     shippingDiscounts: boolean
   }
-  startsAt?: string
-  endsAt?: string
   minimumRequirement?: {
     quantity?: number
     subtotal?: number
   }
-  usageLimit?: number
-  usageLimitPerCustomer?: number
-  customerSelection?: 'all' | 'prerequisite'
   prerequisiteCustomerIds?: string[]
+  singleItem?: boolean
+  excludedTags?: string[]
   appliesToOneTimePurchase?: boolean
   appliesToSubscription?: boolean
   appliesToProducts?: string[]

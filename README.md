@@ -5,8 +5,8 @@ A custom web application for generating and managing Shopify coupon codes with s
 ## Features
 
 ### 🔐 Authentication
-- Google OAuth integration with domain restrictions
-- Authorized domains: `@rockybrands.com`, `@lehigh.com`, `@lehighoutfitters.com`
+- Embedded Shopify app — access is gated by Shopify session tokens
+- Anyone who can open the app from an installed store's admin can use it
 
 ### 🏷️ Brand & Department Management
 - **Brands**: Rocky Brands, Rocky, Georgia, Durango, Muck, XTRATUF, Ranger, Lehigh Outfitters, Lehigh Safety Shoes, Slipgrips, Hard Yakka
@@ -40,8 +40,7 @@ A custom web application for generating and managing Shopify coupon codes with s
 ### Prerequisites
 
 - Node.js 18+ 
-- Shopify store with Admin API access
-- Google OAuth credentials
+- A Shopify Partner app (custom app with Plus organization distribution)
 
 ### Installation
 
@@ -63,22 +62,21 @@ A custom web application for generating and managing Shopify coupon codes with s
    cp .env.local.example .env.local
    ```
    
-   Configure the following environment variables:
+   See `.env.local.example` for the full list. Key values:
    ```env
-   # Shopify Configuration
-   SHOPIFY_SHOP_DOMAIN=your-shop-domain.myshopify.com
-   SHOPIFY_API_VERSION=2024-01
-   SHOPIFY_ACCESS_TOKEN=your-admin-api-access-token
+   # Database (Netlify Database / Postgres)
+   NETLIFY_DB_URL=postgresql://user:pass@host/db
 
-   # Google OAuth Configuration
-   GOOGLE_CLIENT_ID=your-google-client-id
-   GOOGLE_CLIENT_SECRET=your-google-client-secret
-   NEXTAUTH_URL=http://localhost:3000
-   NEXTAUTH_SECRET=your-nextauth-secret
-
-   # Allowed domains for authentication
-   ALLOWED_DOMAINS=rockybrands.com,lehigh.com,lehighoutfitters.com
+   # Shopify app (Partner Dashboard)
+   SHOPIFY_API_KEY=your-shopify-app-client-id
+   SHOPIFY_API_SECRET=your-shopify-app-client-secret
+   APP_URL=http://localhost:3000
+   TOKEN_ENCRYPTION_KEY=   # base64 32-byte key
+   INTERNAL_SHARED_SECRET= # random hex
    ```
+
+   No separate staff sign-in is needed — the app is embedded in Shopify admin
+   and authenticates users via Shopify session tokens.
 
 ### Shopify Setup
 
@@ -95,55 +93,51 @@ A custom web application for generating and managing Shopify coupon codes with s
    - Install the app and copy the Admin API access token
    - Add to your `.env.local` file
 
-### Google OAuth Setup
-
-1. **Create Google Cloud Project**
-   - Go to Google Cloud Console
-   - Create new project or use existing one
-
-2. **Configure OAuth 2.0 Credentials**
-   - Go to APIs & Services → Credentials
-   - Create OAuth 2.0 Client ID
-   - Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-   - Add authorized domains for production
-
 ### Development
 
+The app is embedded in Shopify admin, so local development runs through the
+Shopify CLI (it tunnels and keeps `shopify.app.toml` URLs in sync):
+
 ```bash
-npm run dev
+shopify app dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Then open the app from a dev store's admin → Apps. Plain `npm run dev` still
+works for editing UI, but page loads require `?shop=<store>` params and API
+calls require a session token, so the admin-embedded path is the one to use.
 
 ## Deployment
 
-### Render.com Deployment
+### Shopify app setup (once)
 
-1. **Create Render Account**
-   - Sign up at [render.com](https://render.com)
+1. In the Partner Dashboard create an app, set distribution to **custom app for your Plus organization** (allows install on all brand stores in the org).
+2. Copy the app's client ID/secret into `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET`.
+3. In `shopify.app.toml`, replace `REPLACE_WITH_CLIENT_ID` and `REPLACE_WITH_NETLIFY_URL` placeholders.
+4. From the repo root run `shopify app deploy` to release the discount function (`extensions/single-item-discount`).
 
-2. **Connect Repository**
-   - Connect your GitHub repository
-   - Configure as a Web Service
+### Netlify
 
-3. **Environment Variables**
-   - Add all environment variables from `.env.local`
-   - Set `NEXTAUTH_URL` to your Render domain
+1. Connect the repo as a Netlify site (build: `prisma generate && npm run build`, publish: `.next`, plugin `@netlify/plugin-nextjs` — all in `netlify.toml`).
+2. `@netlify/database` is installed, so Netlify provisions a Postgres database automatically. The schema applies via `netlify/database/migrations/` on each deploy; `NETLIFY_DB_URL` is injected at build and runtime.
+3. Set env vars: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `APP_URL`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SHARED_SECRET`. (`NETLIFY_DB_URL` is injected by `@netlify/database`.)
+4. In Partner Dashboard, request access to **protected customer data** (required for `orders/create` webhooks).
+5. Install on each brand store via `/api/shopify/auth?shop=<store>.myshopify.com`. On install, each store's offline token is saved; the `orders/create` webhook marks redeemed codes and removes them from the other stores automatically.
 
-4. **Build Configuration**
-   - Build command: `npm run build`
-   - Start command: `npm start`
+### Single-item discounts
+
+Groups created with **Single Item Mode** (percentage only) are backed by the deployed
+discount function instead of a basic Shopify discount: the configured percentage is
+applied to the most expensive eligible item in the cart (`quantity: 1`), skipping
+products carrying any of the group's excluded tags.
 
 ## Project Structure
 
 ```
 ├── app/                    # Next.js app directory
 │   ├── api/               # API routes
-│   │   ├── auth/          # Authentication endpoints
 │   │   ├── coupons/       # Coupon management
 │   │   ├── products/      # Product search
 │   │   └── collections/   # Collection search
-│   ├── auth/              # Authentication pages
 │   └── globals.css        # Global styles
 ├── components/            # React components
 │   ├── ui/               # Reusable UI components
@@ -195,8 +189,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Security
 
-- Domain-restricted authentication
-- Secure API token handling
+- Shopify session-token verification on all app API routes (`lib/session-token.ts`)
+- Shop access tokens encrypted at rest (AES-256-GCM)
 - HTTPS required for production
 - Environment variable protection
 
@@ -206,7 +200,7 @@ For issues and questions:
 1. Check the console for error messages
 2. Verify Shopify API permissions
 3. Confirm environment variables are set correctly
-4. Ensure Google OAuth is properly configured
+4. Open the app from a store's Shopify admin (it's an embedded app)
 
 ## License
 

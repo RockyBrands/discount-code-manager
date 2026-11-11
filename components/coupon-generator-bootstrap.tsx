@@ -25,7 +25,13 @@ const couponSchema = z.object({
 
 type CouponFormData = z.infer<typeof couponSchema>
 
-export function CouponGeneratorBootstrap() {
+export function CouponGeneratorBootstrap({
+  shop,
+  defaultBrandId,
+}: {
+  shop?: string
+  defaultBrandId?: string
+}) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedCodes, setGeneratedCodes] = useState<string[]>([])
   const [numberOfCodes, setNumberOfCodes] = useState(1)
@@ -38,6 +44,9 @@ export function CouponGeneratorBootstrap() {
     formState: { errors },
   } = useForm<CouponFormData>({
     resolver: zodResolver(couponSchema),
+    defaultValues: {
+      ...(defaultBrandId ? { brandId: defaultBrandId } : {}),
+    },
   })
 
   const selectedBrand = BRANDS.find(b => b.id === watch('brandId'))
@@ -100,6 +109,7 @@ export function CouponGeneratorBootstrap() {
         body: JSON.stringify({ 
           ...data, 
           codes,
+          ...(shop ? { shop } : {}),
           brandId: selectedBrand?.id 
         }),
       })

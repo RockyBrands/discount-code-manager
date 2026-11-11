@@ -1,0 +1,33 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "REPLACE_WITH_CLIENT_ID"
+name = "Rocky Coupon Code Generator"
+application_url = "https://REPLACE_WITH_NETLIFY_URL/"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+scopes = "write_discounts,read_discounts,read_products,read_collections,read_orders"
+
+[auth]
+redirect_urls = [
+  "https://REPLACE_WITH_NETLIFY_URL/api/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-07"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/create"]
+  uri = "/api/webhooks/orders"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "/api/webhooks/uninstalled"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://REPLACE_WITH_NETLIFY_URL/api/webhooks/compliance"
+  customer_data_request_url = "https://REPLACE_WITH_NETLIFY_URL/api/webhooks/compliance"
+  shop_deletion_url = "https://REPLACE_WITH_NETLIFY_URL/api/webhooks/compliance"

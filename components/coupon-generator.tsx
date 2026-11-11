@@ -76,7 +76,7 @@ export function CouponGenerator() {
         },
         body: JSON.stringify({ 
           ...data, 
-          code,
+          codes: [code],
           brandId: selectedBrand?.id 
         }),
       })
@@ -109,7 +109,7 @@ export function CouponGenerator() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Brand
               </label>
-              <Select onValueChange={(value) => setValue('brandId', value)}>
+              <Select onValueChange={(value: string) => setValue('brandId', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a brand" />
                 </SelectTrigger>
@@ -135,7 +135,7 @@ export function CouponGenerator() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Department
               </label>
-              <Select onValueChange={(value) => setValue('departmentId', value)}>
+              <Select onValueChange={(value: string) => setValue('departmentId', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a department" />
                 </SelectTrigger>
@@ -165,7 +165,7 @@ export function CouponGenerator() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Discount Type
               </label>
-              <Select onValueChange={(value) => setValue('discountType', value as any)}>
+              <Select onValueChange={(value: string) => setValue('discountType', value as any)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select discount type" />
                 </SelectTrigger>
@@ -267,7 +267,7 @@ export function CouponGenerator() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Customer Selection
               </label>
-              <Select onValueChange={(value) => setValue('customerSelection', value as any)}>
+              <Select onValueChange={(value: string) => setValue('customerSelection', value as any)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer selection" />
                 </SelectTrigger>
@@ -285,7 +285,7 @@ export function CouponGenerator() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Applies To
               </label>
-              <Select onValueChange={(value) => setValue('appliesTo', value as any)}>
+              <Select onValueChange={(value: string) => setValue('appliesTo', value as any)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select applies to" />
                 </SelectTrigger>
