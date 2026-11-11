@@ -64,8 +64,9 @@ A custom web application for generating and managing Shopify coupon codes with s
    
    See `.env.local.example` for the full list. Key values:
    ```env
-   # Database (Netlify Database / Postgres)
-   NETLIFY_DB_URL=postgresql://user:pass@host/db
+   # Database (Neon Postgres)
+   DATABASE_URL=postgresql://user:pass@host-pooler.region.aws.neon.tech/db?sslmode=require
+   DIRECT_URL=postgresql://user:pass@host.region.aws.neon.tech/db?sslmode=require
 
    # Shopify app (Partner Dashboard)
    SHOPIFY_API_KEY=your-shopify-app-client-id
@@ -117,9 +118,9 @@ calls require a session token, so the admin-embedded path is the one to use.
 
 ### Netlify
 
-1. Connect the repo as a Netlify site (build: `prisma generate && npm run build`, publish: `.next`, plugin `@netlify/plugin-nextjs` — all in `netlify.toml`).
-2. `@netlify/database` is installed, so Netlify provisions a Postgres database automatically. The schema applies via `netlify/database/migrations/` on each deploy; `NETLIFY_DB_URL` is injected at build and runtime.
-3. Set env vars: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `APP_URL`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SHARED_SECRET`. (`NETLIFY_DB_URL` is injected by `@netlify/database`.)
+1. Connect the repo as a Netlify site (build: `prisma migrate deploy && prisma generate && npm run build`, publish: `.next`, plugin `@netlify/plugin-nextjs` — all in `netlify.toml`).
+2. Create a Neon project (neon.tech free tier). Set `DATABASE_URL` to the **pooled** connection string and `DIRECT_URL` to the unpooled one in Netlify env vars. Migrations in `prisma/migrations/` apply automatically at build via `prisma migrate deploy`.
+3. Set env vars: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `APP_URL`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SHARED_SECRET`, `DATABASE_URL`, `DIRECT_URL`.
 4. In Partner Dashboard, request access to **protected customer data** (required for `orders/create` webhooks).
 5. Install on each brand store via `/api/shopify/auth?shop=<store>.myshopify.com`. On install, each store's offline token is saved; the `orders/create` webhook marks redeemed codes and removes them from the other stores automatically.
 

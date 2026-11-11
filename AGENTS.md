@@ -11,7 +11,8 @@
 
 ## Architecture
 
-- Next.js 14 app dir + Prisma/Postgres (Netlify Database; env `NETLIFY_DB_URL`)
+- Next.js 14 app dir + Prisma/Postgres on Neon (`DATABASE_URL` pooled for
+  runtime, `DIRECT_URL` unpooled for `prisma migrate deploy`)
 - Embedded Shopify app: App Bridge (CDN) issues session-token JWTs; `app/providers.tsx`
   attaches `Authorization: Bearer <token>` to same-origin `/api` fetches and bounces
   non-embedded visits through `/api/shopify/auth`. API routes call
@@ -28,9 +29,9 @@
   webhook plus via Netlify background function `redemption-worker` and scheduled
   `redemption-sweep` (every 5 min) through `/api/internal/process-removals`
   (authed by `INTERNAL_SHARED_SECRET`).
-- DB schema lives in `prisma/schema.prisma`; deploy-time SQL migrations in
-  `netlify/database/migrations/` (Netlify Database applies them per deploy). Regenerate with
-  `npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`.
+- DB schema lives in `prisma/schema.prisma`; standard Prisma migrations in
+  `prisma/migrations/` applied by `prisma migrate deploy` in the Netlify build.
+  Create new ones locally with `npx prisma migrate dev` against `DIRECT_URL`.
 - `shopify.app.toml` — app config: scopes, OAuth redirect, webhook subscriptions,
   compliance webhook URIs. Replace `REPLACE_WITH_*` placeholders; use a custom app with
   Plus organization distribution.
