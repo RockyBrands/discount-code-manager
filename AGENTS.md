@@ -11,8 +11,11 @@
 
 ## Architecture
 
-- Next.js 14 app dir + Prisma/Postgres on Neon (`DATABASE_URL` pooled for
-  runtime, `DIRECT_URL` unpooled for `prisma migrate deploy`)
+- Next.js 14 app dir + Prisma/Postgres on Neon. Runtime queries go through
+  `@prisma/adapter-neon` over WebSocket/443 (works on networks that block
+  outbound 5432). `DATABASE_URL` pooled, `DIRECT_URL` unpooled for
+  `prisma migrate deploy` (Netlify build runs it; locally 5432 may be blocked —
+  apply SQL via the Neon console or the ws pool).
 - Embedded Shopify app: App Bridge (CDN) issues session-token JWTs; `app/providers.tsx`
   attaches `Authorization: Bearer <token>` to same-origin `/api` fetches and bounces
   non-embedded visits through `/api/shopify/auth`. API routes call
