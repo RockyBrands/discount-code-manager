@@ -224,7 +224,10 @@ export default function Dashboard() {
   async function handleInstall() {
     const domain = newShop.trim().toLowerCase()
     if (!domain) return
-    window.location.href = `/api/shopify/auth?shop=${encodeURIComponent(domain)}`
+    // OAuth must run top-level — Shopify refuses to render auth pages inside
+    // the embedded iframe. Cross-origin iframes may navigate the top frame.
+    const authUrl = new URL(`/api/shopify/auth?shop=${encodeURIComponent(domain)}`, window.location.origin)
+    window.top!.location.href = authUrl.toString()
   }
 
   async function handleEdit(group: Group) {
