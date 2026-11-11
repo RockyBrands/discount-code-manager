@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequiredEnv, safeCompare, sanitizeShopDomain, verifyHmac } from '@/lib/shopify-auth'
 import { upsertShopToken } from '@/lib/shopify-session'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
@@ -36,6 +37,10 @@ export async function GET(req: NextRequest) {
   }
 
   const clientId = getRequiredEnv('SHOPIFY_API_KEY')
+  const hostParam = url.searchParams.get('host')
+  const embeddedRedirect = hostParam
+    ? new URL(`/?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(hostParam)}`, req.url)
+    : new URL(`https://${shop}/admin/apps/${clientId}`)
 
   const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
     method: 'POST',
@@ -48,6 +53,15 @@ export async function GET(req: NextRequest) {
   })
 
   if (!tokenRes.ok) {
+    // Authorization codes are single-use. If this callback fired twice (refresh,
+    // double redirect) the first exchange already stored the token — treat a
+    // "code already used" failure as success when the shop is installed.
+    const existing = await prisma.shop.findUnique({ where: { shopDomain: shop } })
+    if (existing?.accessToken && !existing.uninstalledAt) {
+      const res = NextResponse.redirect(embeddedRedirect)
+      res.cookies.delete('shopify_oauth_state')
+      return res
+    }
     const txt = await tokenRes.text()
     return NextResponse.json({ error: 'Failed token exchange', details: txt }, { status: 500 })
   }
@@ -60,14 +74,9 @@ export async function GET(req: NextRequest) {
 
   await upsertShopToken(shop, accessToken, tokenJson.scope)
 
-  const hostParam = url.searchParams.get('host')
   // Embedded app: relaunch inside Shopify admin so App Bridge can issue
   // session tokens. Without a host param, bounce through the admin apps URL.
-  const redirectTo = hostParam
-    ? new URL(`/?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(hostParam)}`, req.url)
-    : new URL(`https://${shop}/admin/apps/${clientId}`)
-
-  const res = NextResponse.redirect(redirectTo)
+  const res = NextResponse.redirect(embeddedRedirect)
   res.cookies.delete('shopify_oauth_state')
   return res
 }
