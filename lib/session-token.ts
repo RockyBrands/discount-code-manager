@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from './prisma'
+import { upsertShopToken } from './shopify-session'
 
 export interface ShopifySession {
   shop: string
@@ -86,13 +87,18 @@ export async function requireShopifySession(
 
   let shop: string
   try {
-    shop = new URL(payload.dest || '').hostname.toLowerCase()
+    const destination = new URL(payload.dest || '')
+    shop = destination.hostname.toLowerCase()
+    if (destination.protocol !== 'https:' || destination.port ||
+        !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) {
+      return unauthorized('Invalid session token destination')
+    }
   } catch {
     return unauthorized('Session token missing dest')
   }
 
   const iss = (payload.iss || '').toLowerCase()
-  if (!iss.startsWith(`https://${shop}/admin`)) {
+  if (iss !== `https://${shop}/admin`) {
     return unauthorized('Session token issuer mismatch')
   }
 
@@ -101,7 +107,32 @@ export async function requireShopifySession(
     select: { uninstalledAt: true },
   })
   if (!installed || installed.uninstalledAt) {
-    return unauthorized('App is not installed on this shop')
+    const exchange = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      cache: 'no-store',
+      body: new URLSearchParams({
+        client_id: apiKey,
+        client_secret: secret,
+        grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+        subject_token: token,
+        subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+        requested_token_type: 'urn:shopify:params:oauth:token-type:offline-access-token',
+        expiring: '0',
+      }),
+    })
+    if (!exchange.ok) {
+      console.error('Shopify token exchange rejected:', exchange.status)
+      return NextResponse.json(
+        { error: 'Unable to connect this installation. Reopen the app in Shopify admin and try again.' },
+        { status: exchange.status === 400 ? 401 : 502 }
+      )
+    }
+    const credentials = await exchange.json()
+    if (typeof credentials.access_token !== 'string' || !credentials.access_token) {
+      return NextResponse.json({ error: 'Shopify returned no installation token' }, { status: 502 })
+    }
+    await upsertShopToken(shop, credentials.access_token, credentials.scope)
   }
 
   return { shop, userId: payload.sub || '' }

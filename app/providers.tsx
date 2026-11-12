@@ -18,6 +18,7 @@ declare global {
  */
 export function Providers({ children }: { children: React.ReactNode }) {
   const [blocked, setBlocked] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -53,7 +54,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const bridgeTimeout = window.setTimeout(() => setBlocked(true), 15000)
+    const waitForBridge = window.setInterval(() => {
+      if (window.shopify?.idToken) {
+        setReady(true)
+        window.clearTimeout(bridgeTimeout)
+        window.clearInterval(waitForBridge)
+      }
+    }, 100)
+
     return () => {
+      window.clearTimeout(bridgeTimeout)
+      window.clearInterval(waitForBridge)
       window.fetch = originalFetch
     }
   }, [])
@@ -69,6 +81,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
+
+  if (!ready) return <div className="container py-5 text-muted">Connecting to Shopify…</div>
 
   return children
 }

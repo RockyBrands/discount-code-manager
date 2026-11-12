@@ -105,16 +105,24 @@ export default function Dashboard() {
     loadData()
   }, [])
 
+  const [loadError, setLoadError] = useState('')
+
   async function loadData() {
     try {
+      setLoadError('')
       const [storesRes, groupsRes] = await Promise.all([
         fetch('/api/stores'),
         fetch('/api/discount-groups'),
       ])
-      if (storesRes.ok) setStores(await storesRes.json())
-      if (groupsRes.ok) setGroups(await groupsRes.json())
+      if (!storesRes.ok || !groupsRes.ok) {
+        const failed = !storesRes.ok ? storesRes : groupsRes
+        const details = await failed.json().catch(() => ({}))
+        throw new Error(details.error || `Unable to load dashboard (${failed.status})`)
+      }
+      setStores(await storesRes.json())
+      setGroups(await groupsRes.json())
     } catch (err) {
-      console.error(err)
+      setLoadError(err instanceof Error ? err.message : 'Unable to load dashboard')
     }
   }
 
@@ -332,6 +340,7 @@ export default function Dashboard() {
 
   return (
     <div className="container py-4">
+      {loadError && <div className="alert alert-danger" role="alert">{loadError}</div>}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h1 className="h3 mb-0">Discount Dashboard</h1>
