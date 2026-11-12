@@ -4,7 +4,8 @@ import { upsertShopToken } from '@/lib/shopify-session'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url)
+  try {
+    const url = new URL(req.url)
   const shopParam = url.searchParams.get('shop')
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
@@ -79,4 +80,11 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(embeddedRedirect)
   res.cookies.delete('shopify_oauth_state')
   return res
+  } catch (error) {
+    console.error('OAuth callback failed:', error)
+    return NextResponse.json(
+      { error: 'OAuth callback failed', details: (error as Error).message },
+      { status: 500 }
+    )
+  }
 }
