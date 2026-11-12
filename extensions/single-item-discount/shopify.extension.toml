@@ -3,6 +3,8 @@ api_version = "2026-07"
 [[extensions]]
 name = "t:name"
 handle = "single-item-discount"
+
+uid = "6586806a-41f5-5455-7f87-052d63ad34fef6d5eb2d"
 type = "function"
 description = "t:description"
 

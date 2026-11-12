@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "REPLACE_WITH_CLIENT_ID"
+client_id = "ec3631460a2c12549b32ade9bf269ea7"
 name = "Rocky Coupon Code Generator"
 application_url = "https://discount-code-manager.netlify.app"
 embedded = true

@@ -68,6 +68,30 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [rulesOpen, setRulesOpen] = useState<string | null>(null)
   const [storesOpen, setStoresOpen] = useState(false)
+  const [downloading, setDownloading] = useState<string | null>(null)
+
+  async function downloadCodes(group: Group) {
+    setDownloading(group.id)
+    try {
+      const response = await fetch(`/api/discount-groups/${group.id}/codes`)
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to download discount codes')
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${group.title.replace(/[^a-z0-9_-]+/gi, '-').slice(0, 80) || 'discount'}-codes.csv`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to download discount codes')
+    } finally {
+      setDownloading(null)
+    }
+  }
 
   const defaultFormState = () => ({
     title: '',
@@ -677,6 +701,9 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div className="btn-group">
+                  <button className="btn btn-sm btn-outline-success" onClick={() => downloadCodes(group)} disabled={downloading !== null}>
+                    {downloading === group.id ? 'Downloading...' : 'Download CSV'}
+                  </button>
                   <button className="btn btn-sm btn-outline-primary" onClick={() => setActiveGroup(group.id)}>
                     Add Codes
                   </button>

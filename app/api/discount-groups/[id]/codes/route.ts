@@ -35,6 +35,47 @@ function buildDiscountInput(group: any): DiscountCodeRequest {
   }
 }
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  const { response: authError } = await getSessionOr401(request)
+  if (authError) return authError
+  try {
+    const group = await prisma.discountGroup.findUnique({
+      where: { id: params.id },
+      select: {
+        codes: {
+          orderBy: { code: 'asc' },
+          select: { code: true, redeemedAt: true, deletedAt: true },
+        },
+      },
+    })
+    if (!group) return NextResponse.json({ error: 'Discount group not found' }, { status: 404 })
+
+    const cell = (value: string) => {
+      const safe = /^[\s]*[=+@-]/.test(value) || /^[\t\r\n]/.test(value) ? `'${value}` : value
+      return `"${safe.replace(/"/g, '""')}"`
+    }
+    const rows = [
+      ['Code', 'Status', 'Redeemed at (UTC)', 'Removed at (UTC)'],
+      ...group.codes.map(code => [
+        code.code,
+        code.redeemedAt ? 'Redeemed' : code.deletedAt ? 'Removed' : 'Unused',
+        code.redeemedAt?.toISOString() || '',
+        code.deletedAt?.toISOString() || '',
+      ]),
+    ]
+    return new NextResponse('\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n', {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="discount-codes.csv"',
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (error) {
+    console.error('Error exporting discount codes:', error)
+    return NextResponse.json({ error: 'Failed to download discount codes' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const { response: authError } = await getSessionOr401(request)
   if (authError) return authError
