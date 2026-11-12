@@ -8,14 +8,18 @@ import ws from 'ws'
 // Migrations still use DIRECT_URL over TCP (build/CLI path only).
 neonConfig.webSocketConstructor = ws
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-const adapter = new PrismaNeon(pool)
+function createPrismaClient() {
+  if (process.env.NODE_ENV === 'production') return new PrismaClient()
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  return new PrismaClient({ adapter: new PrismaNeon(pool) })
+}
 
 declare global {
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined
 }
 
-export const prisma = global.prisma || new PrismaClient({ adapter })
+export const prisma = global.prisma || createPrismaClient()
 
 global.prisma = prisma
