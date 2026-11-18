@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "ec3631460a2c12549b32ade9bf269ea7"
-name = "Rocky Coupon Code Generator"
+name = "Mult-Site Discount Manager"
 application_url = "https://discount-code-manager.netlify.app"
 embedded = true
 

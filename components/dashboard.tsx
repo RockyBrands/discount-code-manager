@@ -16,10 +16,12 @@ interface Group {
   discountType: string
   discountValue: number
   minimumOrderAmount: number | null
+  maxDiscountAmount: number | null
   startsAt: string | null
   endsAt: string | null
   customerSelection: string
   singleItem?: boolean
+  freeShipping?: boolean
   excludedTags?: string[]
   codeCount: number
   stores: string[]
@@ -98,10 +100,12 @@ export default function Dashboard() {
     discountType: 'percentage',
     discountValue: '',
     minimumOrderAmount: '',
+    maxDiscountAmount: '',
     startsAt: defaultStartsAt(),
     endsAt: defaultEndsAt(),
     customerSelection: 'all',
     singleItem: true,
+    freeShipping: false,
     advanced: false,
     excludedTags: 'gift_card',
     billingEntity: 'rocky-boots',
@@ -198,10 +202,12 @@ export default function Dashboard() {
       discountType: form.discountType,
       discountValue: parseFloat(form.discountValue),
       minimumOrderAmount: form.minimumOrderAmount ? parseFloat(form.minimumOrderAmount) : undefined,
+      maxDiscountAmount: form.singleItem && form.maxDiscountAmount ? parseFloat(form.maxDiscountAmount) : undefined,
       startsAt: toIsoString(form.startsAt),
       endsAt: toIsoString(form.endsAt),
       customerSelection: form.customerSelection,
       singleItem: form.singleItem,
+      freeShipping: form.singleItem && form.freeShipping,
       excludedTags: parseTags(form.excludedTags),
     }
 
@@ -269,10 +275,12 @@ export default function Dashboard() {
       discountType: group.discountType,
       discountValue: group.discountValue,
       minimumOrderAmount: group.minimumOrderAmount || '',
+      maxDiscountAmount: group.maxDiscountAmount ?? '',
       startsAt: formatDateTimeLocal(group.startsAt),
       endsAt: formatDateTimeLocal(group.endsAt),
       customerSelection: group.customerSelection,
       singleItem: (group as any).singleItem || false,
+      freeShipping: group.freeShipping || false,
       excludedTags: ((group as any).excludedTags || []).join(', '),
     })
   }
@@ -286,9 +294,11 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...editingForm,
+          freeShipping: !!editingForm.singleItem && !!editingForm.freeShipping,
           excludedTags: parseTags(editingForm.excludedTags || ''),
           discountValue: parseFloat(editingForm.discountValue),
           minimumOrderAmount: editingForm.minimumOrderAmount ? parseFloat(editingForm.minimumOrderAmount) : undefined,
+          maxDiscountAmount: editingForm.singleItem && editingForm.maxDiscountAmount !== '' && editingForm.maxDiscountAmount != null ? parseFloat(editingForm.maxDiscountAmount) : null,
           startsAt: toIsoString(editingForm.startsAt),
           endsAt: toIsoString(editingForm.endsAt),
         }),
@@ -614,6 +624,23 @@ export default function Dashboard() {
                   )}
                 </div>
 
+                <div className="form-check mb-3">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="freeShipping"
+                    checked={form.freeShipping}
+                    disabled={!(form.singleItem && form.discountType === 'percentage')}
+                    onChange={(e) => setForm({ ...form, freeShipping: e.target.checked })}
+                  />
+                  <label className="form-check-label" htmlFor="freeShipping">
+                    Free economy shipping
+                  </label>
+                  {!(form.singleItem && form.discountType === 'percentage') && (
+                    <div className="form-text">Requires % off one item only</div>
+                  )}
+                </div>
+
                 <div className="row g-3">
                   <div className="col-md-4">
                     <label className="form-label">Excluded Product Tags</label>
@@ -634,6 +661,19 @@ export default function Dashboard() {
                       value={form.minimumOrderAmount}
                       onChange={(e) => setForm({ ...form, minimumOrderAmount: e.target.value })}
                     />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Max Discount ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-control"
+                      value={form.maxDiscountAmount}
+                      disabled={!(form.singleItem && form.discountType === 'percentage')}
+                      onChange={(e) => setForm({ ...form, maxDiscountAmount: e.target.value })}
+                    />
+                    <div className="form-text">Requires % off one item only</div>
                   </div>
                   <div className="col-md-4">
                     <label className="form-label">Customer Selection</label>
@@ -692,6 +732,8 @@ export default function Dashboard() {
                     {group.singleItem ? ' · single item' : ''}
                     {group.excludedTags && group.excludedTags.length ? ` · excludes ${group.excludedTags.join(', ')}` : ''}
                     {group.minimumOrderAmount ? ` · min $${group.minimumOrderAmount}` : ''}
+                    {group.maxDiscountAmount ? ` · max $${group.maxDiscountAmount} off` : ''}
+                    {group.freeShipping ? ' · free economy shipping' : ''}
                     {group.startsAt ? ` · starts ${new Date(group.startsAt).toLocaleString()}` : ''}
                     {group.endsAt ? ` · ends ${new Date(group.endsAt).toLocaleString()}` : ''}
                   </p>
@@ -727,6 +769,8 @@ export default function Dashboard() {
                     <li><strong>Type:</strong> {group.discountType === 'percentage' ? 'Percent off' : 'Fixed amount off'}</li>
                     <li><strong>Value:</strong> {group.discountType === 'percentage' ? `${group.discountValue}%` : `$${group.discountValue}`}</li>
                     <li><strong>Minimum order:</strong> {group.minimumOrderAmount ? `$${group.minimumOrderAmount}` : 'None'}</li>
+                    <li><strong>Max discount:</strong> {group.maxDiscountAmount ? `$${group.maxDiscountAmount}` : 'None'}</li>
+                    <li><strong>Free shipping:</strong> {group.freeShipping ? 'Economy only' : 'No'}</li>
                     <li><strong>Customer selection:</strong> {group.customerSelection === 'all' ? 'All customers' : 'Specific customers'}</li>
                     <li><strong>Single item:</strong> {group.singleItem ? 'Yes (most expensive eligible item)' : 'No'}</li>
                     <li><strong>Excluded tags:</strong> {group.excludedTags && group.excludedTags.length ? group.excludedTags.join(', ') : 'None'}</li>
@@ -782,6 +826,18 @@ export default function Dashboard() {
                       />
                     </div>
                     <div className="col-md-2">
+                      <label className="form-label">Max Discount ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="form-control"
+                        value={editingForm.maxDiscountAmount ?? ''}
+                        disabled={!(editingForm.singleItem && editingForm.discountType === 'percentage')}
+                        onChange={(e) => setEditingForm({ ...editingForm, maxDiscountAmount: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-md-2">
                       <label className="form-label">Start</label>
                       <input
                         type="datetime-local"
@@ -810,6 +866,19 @@ export default function Dashboard() {
                           onChange={(e) => setEditingForm({ ...editingForm, singleItem: e.target.checked })}
                         />
                         <label className="form-check-label">one item</label>
+                      </div>
+                    </div>
+                    <div className="col-md-2">
+                      <label className="form-label">Free Shipping</label>
+                      <div className="form-check mt-2">
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          checked={!!editingForm.freeShipping}
+                          disabled={!(editingForm.singleItem && editingForm.discountType === 'percentage')}
+                          onChange={(e) => setEditingForm({ ...editingForm, freeShipping: e.target.checked })}
+                        />
+                        <label className="form-check-label">economy</label>
                       </div>
                     </div>
                     <div className="col-md-4">

@@ -24,11 +24,21 @@ function normalizeCodes(codes: string[]) {
     .filter(c => c.length > 0 && !seen.has(c) && seen.add(c))
 }
 
+function validateMaxDiscountAmount(value: any): string | null {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return 'maxDiscountAmount must be a positive number'
+  }
+  return null
+}
+
 function buildDiscountInput(data: any): DiscountCodeRequest {
   return {
     discountType: data.discountType,
     discountValue: data.discountValue,
     minimumOrderAmount: data.minimumOrderAmount,
+    maxDiscountAmount: data.maxDiscountAmount,
+    freeShipping: !!data.freeShipping,
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     customerSelection: data.customerSelection || 'all',
@@ -83,6 +93,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { title, discountType, discountValue, minimumOrderAmount, startsAt, endsAt, customerSelection } = body
     const singleItem = !!body.singleItem
+    const freeShipping = !!body.freeShipping
     const excludedTags = buildDiscountInput(body).excludedTags
 
     if (!title || !discountType || discountValue === undefined) {
@@ -91,6 +102,17 @@ export async function POST(request: NextRequest) {
 
     if (singleItem && discountType !== 'percentage') {
       return NextResponse.json({ error: 'Single-item mode only supports percentage discounts' }, { status: 400 })
+    }
+
+    const maxDiscountError = validateMaxDiscountAmount(body.maxDiscountAmount)
+    if (maxDiscountError) {
+      return NextResponse.json({ error: maxDiscountError }, { status: 400 })
+    }
+    if (body.maxDiscountAmount !== undefined && body.maxDiscountAmount !== null && !singleItem) {
+      return NextResponse.json({ error: 'Max discount only supports single-item discounts' }, { status: 400 })
+    }
+    if (freeShipping && !singleItem) {
+      return NextResponse.json({ error: 'Free shipping only supports single-item discounts' }, { status: 400 })
     }
 
     let codes: string[] = []
@@ -135,6 +157,8 @@ export async function POST(request: NextRequest) {
         customerSelection: customerSelection || 'all',
         singleItem,
         excludedTags,
+        maxDiscountAmount: body.maxDiscountAmount ?? null,
+        freeShipping,
         usageLimit: 1,
         codes: {
           createMany: { data: codes.map(code => ({ code })) },

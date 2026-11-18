@@ -1,0 +1,45 @@
+query DeliveryInput($excludedTags: [String!], $collectionIds: [ID!]) {
+  cart {
+    cost {
+      subtotalAmount {
+        amount
+      }
+    }
+    lines {
+      id
+      quantity
+      cost {
+        amountPerQuantity {
+          amount
+        }
+        subtotalAmount {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          product {
+            id
+            hasAnyTag(tags: $excludedTags)
+            inAnyCollection(ids: $collectionIds)
+          }
+        }
+      }
+    }
+    deliveryGroups {
+      id
+      deliveryOptions {
+        handle
+        title
+        deliveryMethodType
+      }
+    }
+  }
+  discount {
+    discountClasses
+    metafield(key: "function-configuration") {
+      value
+    }
+  }
+}

@@ -14,6 +14,12 @@ description = "t:description"
   input_variables = { namespace = "$app", key = "function-configuration" }
   export = "cart-lines-discounts-generate-run"
 
+  [[extensions.targeting]]
+  target = "cart.delivery-options.discounts.generate.run"
+  input_query = "src/cart_delivery_options_discounts_generate_run.graphql"
+  input_variables = { namespace = "$app", key = "function-configuration" }
+  export = "cart-delivery-options-discounts-generate-run"
+
   [extensions.build]
   command = ""
   path = "dist/function.wasm"

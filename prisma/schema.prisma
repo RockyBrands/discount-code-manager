@@ -32,6 +32,8 @@ model DiscountGroup {
   singleItem             Boolean        @default(false)
   excludedTags           String[]       @default([])
   minimumOrderAmount     Float?
+  maxDiscountAmount      Float?
+  freeShipping           Boolean        @default(false)
   usageLimit             Int?           @default(1)
   appliesOncePerCustomer Boolean        @default(false)
   startsAt               DateTime?

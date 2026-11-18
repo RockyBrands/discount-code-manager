@@ -1,0 +1,44 @@
+{
+  "payload": {
+    "export": "cart-delivery-options-discounts-generate-run",
+    "target": "cart.delivery-options.discounts.generate.run",
+    "input": {
+      "cart": {
+        "cost": {
+          "subtotalAmount": { "amount": "100.0" }
+        },
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/1",
+            "quantity": 1,
+            "cost": {
+              "amountPerQuantity": { "amount": "100.0" },
+              "subtotalAmount": { "amount": "100.0" }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "product": { "id": "gid://shopify/Product/1", "hasAnyTag": false, "inAnyCollection": true }
+            }
+          }
+        ],
+        "deliveryGroups": [
+          {
+            "id": "gid://shopify/CartDeliveryGroup/1",
+            "deliveryOptions": [
+              { "handle": "economy-shipping", "title": "Economy Shipping", "deliveryMethodType": "SHIPPING" }
+            ]
+          }
+        ]
+      },
+      "discount": {
+        "discountClasses": ["PRODUCT", "SHIPPING"],
+        "metafield": {
+          "value": "{\"percentage\":50,\"excludedTags\":[\"no-discount\"],\"collectionIds\":[\"gid://shopify/Collection/9\"],\"minimumSubtotal\":0,\"freeShipping\":false}"
+        }
+      }
+    },
+    "output": {
+      "operations": []
+    }
+  }
+}

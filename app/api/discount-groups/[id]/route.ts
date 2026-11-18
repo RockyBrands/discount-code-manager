@@ -11,11 +11,21 @@ function toIsoString(value: any) {
   return undefined
 }
 
+function validateMaxDiscountAmount(value: any): string | null {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return 'maxDiscountAmount must be a positive number'
+  }
+  return null
+}
+
 function buildDiscountInput(data: any): DiscountCodeRequest {
   return {
     discountType: data.discountType,
     discountValue: data.discountValue,
     minimumOrderAmount: data.minimumOrderAmount,
+    maxDiscountAmount: data.maxDiscountAmount,
+    freeShipping: !!data.freeShipping,
     startsAt: toIsoString(data.startsAt),
     endsAt: toIsoString(data.endsAt),
     customerSelection: data.customerSelection || 'all',
@@ -72,6 +82,19 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Single-item mode only supports percentage discounts' }, { status: 400 })
     }
 
+    let maxDiscountAmount = body.maxDiscountAmount === undefined ? existing.maxDiscountAmount : body.maxDiscountAmount
+    const maxDiscountError = validateMaxDiscountAmount(maxDiscountAmount)
+    if (maxDiscountError) {
+      return NextResponse.json({ error: maxDiscountError }, { status: 400 })
+    }
+    if (!singleItem) {
+      maxDiscountAmount = null
+    }
+    let freeShipping = body.freeShipping === undefined ? existing.freeShipping : !!body.freeShipping
+    if (!singleItem) {
+      freeShipping = false
+    }
+
     const group = await prisma.discountGroup.update({
       where: { id: params.id },
       data: {
@@ -81,6 +104,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         singleItem,
         excludedTags,
         minimumOrderAmount: body.minimumOrderAmount,
+        maxDiscountAmount,
+        freeShipping,
         startsAt: body.startsAt ? new Date(body.startsAt) : existing.startsAt,
         endsAt: body.endsAt ? new Date(body.endsAt) : existing.endsAt,
         customerSelection: body.customerSelection || existing.customerSelection,
@@ -90,6 +115,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const discountInput = buildDiscountInput({
       ...group,
       ...body,
+      maxDiscountAmount,
+      freeShipping,
     })
     const codeList = existing.codes.map(c => c.code)
 

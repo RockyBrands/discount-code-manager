@@ -64,6 +64,8 @@ export interface DiscountCodeRequest {
   discountType: 'percentage' | 'fixed_amount' | 'free_shipping'
   discountValue: number
   minimumOrderAmount?: number
+  maxDiscountAmount?: number | null
+  freeShipping?: boolean
   usageLimit?: number
   usageLimitPerCustomer?: number
   startsAt?: string

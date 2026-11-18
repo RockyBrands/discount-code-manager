@@ -88,6 +88,8 @@ export class ShopifyService {
       percentage: discountCode.discountValue,
       excludedTags: (discountCode.excludedTags || []).map(t => t.trim()).filter(Boolean),
       minimumSubtotal: typeof discountCode.minimumOrderAmount === 'number' ? discountCode.minimumOrderAmount : null,
+      maxDiscountAmount: typeof discountCode.maxDiscountAmount === 'number' && discountCode.maxDiscountAmount > 0 ? discountCode.maxDiscountAmount : null,
+      freeShipping: !!discountCode.freeShipping,
       collectionIds: discountCode.appliesToCollections || [],
     }
   }
@@ -445,7 +447,7 @@ export class ShopifyService {
       startsAt,
       ...(endsAt ? { endsAt } : {}),
       functionHandle: SINGLE_ITEM_FUNCTION_HANDLE,
-      discountClasses: ['PRODUCT'],
+      discountClasses: discountCode.freeShipping ? ['PRODUCT', 'SHIPPING'] : ['PRODUCT'],
       customerSelection: this.buildCustomerSelection(discountCode),
       combinesWith: this.buildCombinesWith(discountCode),
       usageLimit: 1,
