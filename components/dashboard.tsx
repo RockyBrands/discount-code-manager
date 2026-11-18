@@ -179,6 +179,34 @@ export default function Dashboard() {
       .filter(c => c.length > 0)
   }
 
+  // Large code lists can't be pushed to every store in a single request —
+  // Netlify kills the function past its time limit and the response is an HTML
+  // error page. Push in small chunks instead, one store per request.
+  async function pushCodesInChunks(groupId: string, codes: string[], shops: string[], mode = 'add') {
+    const CHUNK = 100
+    const failures: { shop: string; error: string }[] = []
+    for (let i = 0; i < codes.length; i += CHUNK) {
+      const chunk = codes.slice(i, i + CHUNK)
+      await Promise.all(shops.map(async (shop) => {
+        try {
+          const res = await fetch(`/api/discount-groups/${groupId}/codes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ codes: chunk, mode, shopDomain: shop }),
+          })
+          const data = await res.json().catch(() => ({}))
+          const storeResult = data.storeResults?.find((r: any) => r.shop === shop)
+          if (!res.ok || storeResult?.success === false) {
+            failures.push({ shop, error: storeResult?.error || data.error || `Request failed (${res.status})` })
+          }
+        } catch (err) {
+          failures.push({ shop, error: err instanceof Error ? err.message : 'Request failed' })
+        }
+      }))
+    }
+    return failures
+  }
+
   function buildCodes(): string[] {
     const fromInput = parseCodes(form.codeInput)
     if (fromInput.length > 0) return fromInput
@@ -232,10 +260,25 @@ export default function Dashboard() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to create group')
-      const generated = data.group?.codes?.map((c: any) => c.code) || []
-      alert(generated.length
-        ? `Discount group created with ${generated.length} code${generated.length === 1 ? '' : 's'}: ${generated.slice(0, 5).join(', ')}${generated.length > 5 ? ` (+${generated.length - 5} more)` : ''}`
-        : 'Discount group created')
+      const generated: string[] = data.group?.codes?.map((c: any) => c.code) || []
+      const createFailures: { shop: string; error?: string }[] =
+        (data.storeResults || []).filter((r: any) => !r.success)
+      // The create request only pushed the first code to each store — push the
+      // rest in chunks to the stores that succeeded.
+      const okShops = (data.storeResults || []).filter((r: any) => r.success).map((r: any) => r.shop)
+      const pushFailures = generated.length > 1 && okShops.length
+        ? await pushCodesInChunks(data.group.id, generated.slice(1), okShops)
+        : []
+      const problems = [
+        ...createFailures.map(f => `${f.shop}: ${f.error || 'failed'}`),
+        ...pushFailures.map(f => `${f.shop}: ${f.error}`),
+      ]
+      alert(
+        (generated.length
+          ? `Discount group created with ${generated.length} code${generated.length === 1 ? '' : 's'}: ${generated.slice(0, 5).join(', ')}${generated.length > 5 ? ` (+${generated.length - 5} more)` : ''}`
+          : 'Discount group created') +
+        (problems.length ? `\n\nStore failures:\n${problems.join('\n')}` : '')
+      )
       setForm(defaultFormState())
       await loadData()
     } catch (err: any) {
@@ -305,7 +348,10 @@ export default function Dashboard() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Update failed')
-      alert('Group updated')
+      const storeFailures = (data.storeResults || []).filter((r: any) => !r.success)
+      alert(storeFailures.length
+        ? `Group updated, but failed on:\n${storeFailures.map((r: any) => `${r.shop}: ${r.error || 'unknown error'}`).join('\n')}`
+        : 'Group updated')
       setEditingId(null)
       setEditingForm(null)
       await loadData()
@@ -346,6 +392,22 @@ export default function Dashboard() {
     const codes = buildActiveCodes()
     if (codes.length === 0) {
       alert('Please provide codes or generate them')
+      return
+    }
+    const group = groups.find(g => g.id === activeGroup)
+    if ((activeForm.mode === 'add' || activeForm.mode === 'block') && group) {
+      try {
+        const failures = await pushCodesInChunks(activeGroup, codes, group.stores, activeForm.mode)
+        alert(
+          `${codes.length} codes added` +
+          (failures.length ? ` — failures:\n${failures.map(f => `${f.shop}: ${f.error}`).join('\n')}` : '')
+        )
+        setActiveGroup(null)
+        setActiveForm({ codeInput: '', generatePrefix: '', generateCount: 10, mode: 'add' })
+        await loadData()
+      } catch (err: any) {
+        alert(err.message)
+      }
       return
     }
     try {

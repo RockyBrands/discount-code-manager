@@ -568,7 +568,7 @@ export class ShopifyService {
     return results
   }
 
-  private async pollBulkRedeemCreation(bulkCreationId: string, maxTries = 30) {
+  private async pollBulkRedeemCreation(bulkCreationId: string, maxTries = 12) {
     const client = this.getClient()
     for (let i = 0; i < maxTries; i++) {
       const response = await client.request(

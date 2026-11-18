@@ -182,7 +182,10 @@ export async function POST(request: NextRequest) {
 
       try {
         const service = serviceForShop(shop)
-        const nodeId = await service.createGroupDiscount(group.title, discountInput, codes, shop.collectionId || undefined)
+        // Create with only the first code — bulk-adding the rest is done by the
+        // client in chunked follow-up requests so this stays under the
+        // serverless function time limit.
+        const nodeId = await service.createGroupDiscount(group.title, discountInput, codes.slice(0, 1), shop.collectionId || undefined)
         await prisma.shopDiscount.create({
           data: {
             discountGroupId: group.id,

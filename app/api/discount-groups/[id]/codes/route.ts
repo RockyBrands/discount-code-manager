@@ -82,6 +82,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const body = await request.json()
     const mode = body.mode || 'add'
+    // Optional: limit Shopify pushes to a single store so the client can spread
+    // large batches across multiple requests (serverless time limit).
+    const shopDomain = typeof body.shopDomain === 'string' ? body.shopDomain.trim().toLowerCase() : null
 
     const group = await prisma.discountGroup.findUnique({
       where: { id: params.id },
@@ -205,8 +208,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ added: [], skipped: newCodes, mode })
     }
 
+    const targetShopDiscounts = shopDomain
+      ? group.shopDiscounts.filter(sd => sd.shop.shopDomain === shopDomain)
+      : group.shopDiscounts
+
+    if (shopDomain && targetShopDiscounts.length === 0) {
+      return NextResponse.json({ error: 'No discount found for that store' }, { status: 404 })
+    }
+
+    // Record the codes in the DB before pushing to Shopify. If the function is
+    // killed mid-push, the DB still reflects the intended code list and the
+    // storeResults flag which stores missed it.
+    await prisma.discountCode.createMany({
+      data: toAdd.map(code => ({ discountGroupId: group.id, code })),
+      skipDuplicates: true,
+    })
+    // Resurrect codes that were previously soft-deleted
+    await prisma.discountCode.updateMany({
+      where: { discountGroupId: group.id, code: { in: toAdd }, deletedAt: { not: null } },
+      data: { deletedAt: null },
+    })
+
     const storeResults = []
-    for (const shopDiscount of group.shopDiscounts) {
+    for (const shopDiscount of targetShopDiscounts) {
       try {
         const service = serviceForShop(shopDiscount.shop)
         await service.addRedeemCodes(shopDiscount.shopifyDiscountId, toAdd)
@@ -215,19 +239,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         console.error(`Failed to add codes to ${shopDiscount.shop.shopDomain}:`, err)
         storeResults.push({ shop: shopDiscount.shop.shopDomain, success: false, error: (err as Error).message })
       }
-    }
-
-    const successful = storeResults.filter(r => r.success).length
-    if (successful > 0) {
-      await prisma.discountCode.createMany({
-        data: toAdd.map(code => ({ discountGroupId: group.id, code })),
-        skipDuplicates: true,
-      })
-      // Resurrect codes that were previously soft-deleted
-      await prisma.discountCode.updateMany({
-        where: { discountGroupId: group.id, code: { in: toAdd }, deletedAt: { not: null } },
-        data: { deletedAt: null },
-      })
     }
 
     return NextResponse.json({
