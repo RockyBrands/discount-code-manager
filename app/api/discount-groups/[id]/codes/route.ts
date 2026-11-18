@@ -113,9 +113,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const existingCodes = new Set(group.codes.filter(c => !c.deletedAt).map(c => c.code.toUpperCase()))
     const usedCodes = new Set(group.codes.filter(c => c.redeemedAt).map(c => c.code.toUpperCase()))
 
+    // Disconnected (uninstalled) stores keep their ShopDiscount rows but must
+    // not receive Shopify calls — serviceForShop returns null for them anyway.
+    const activeShopDiscounts = group.shopDiscounts.filter(sd => !sd.shop.uninstalledAt)
+
     if (mode === 'replace') {
       // delete existing discount nodes and recreate
-      for (const shopDiscount of group.shopDiscounts) {
+      for (const shopDiscount of activeShopDiscounts) {
         try {
           const service = serviceForShop(shopDiscount.shop)
           await service.deleteDiscountCodeNode(shopDiscount.shopifyDiscountId)
@@ -130,7 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const discountInput = buildDiscountInput(group)
       const storeResults = []
 
-      for (const shop of group.shopDiscounts.map(sd => sd.shop)) {
+      for (const shop of activeShopDiscounts.map(sd => sd.shop)) {
         if (!group.singleItem && !shop.collectionId) {
           storeResults.push({ shop: shop.shopDomain, success: false, error: 'No collection ID configured' })
           continue
@@ -168,7 +172,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const missing = newCodes.filter(c => !activeCodes.has(c))
 
       const storeResults = []
-      for (const shopDiscount of group.shopDiscounts) {
+      for (const shopDiscount of activeShopDiscounts) {
         const service = serviceForShop(shopDiscount.shop)
         const failures: { code: string; error: string }[] = []
         for (const code of toRemove) {
@@ -209,8 +213,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const targetShopDiscounts = shopDomain
-      ? group.shopDiscounts.filter(sd => sd.shop.shopDomain === shopDomain)
-      : group.shopDiscounts
+      ? activeShopDiscounts.filter(sd => sd.shop.shopDomain === shopDomain)
+      : activeShopDiscounts
 
     if (shopDomain && targetShopDiscounts.length === 0) {
       return NextResponse.json({ error: 'No discount found for that store' }, { status: 404 })

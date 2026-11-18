@@ -22,6 +22,7 @@ interface Group {
   customerSelection: string
   singleItem?: boolean
   freeShipping?: boolean
+  targetShopDomain?: string | null
   excludedTags?: string[]
   codeCount: number
   stores: string[]
@@ -106,6 +107,7 @@ export default function Dashboard() {
     customerSelection: 'all',
     singleItem: true,
     freeShipping: false,
+    targetStore: '',
     advanced: false,
     excludedTags: 'gift_card',
     billingEntity: 'rocky-boots',
@@ -235,6 +237,7 @@ export default function Dashboard() {
       endsAt: toIsoString(form.endsAt),
       customerSelection: form.customerSelection,
       singleItem: form.singleItem,
+      targetShopDomain: form.targetStore || undefined,
       freeShipping: form.singleItem && form.freeShipping,
       excludedTags: parseTags(form.excludedTags),
     }
@@ -296,6 +299,25 @@ export default function Dashboard() {
         body: JSON.stringify({ shopDomain: shop, collectionId, label }),
       })
       if (!res.ok) throw new Error('Update failed')
+      await loadData()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  async function handleDisconnect(store: Store) {
+    if (!confirm(`Disconnect ${store.shopDomain}? Discount codes managed by this app will be deactivated on that store.`)) return
+    try {
+      const res = await fetch('/api/stores', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shopDomain: store.shopDomain }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Disconnect failed')
+      alert(data.failures?.length
+        ? `Disconnected ${store.shopDomain}, but ${data.failures.length} discount(s) could not be removed — delete them manually in that store's admin.`
+        : `${store.shopDomain} disconnected`)
       await loadData()
     } catch (err: any) {
       alert(err.message)
@@ -501,6 +523,11 @@ export default function Dashboard() {
                     onBlur={(e) => handleUpdateCollection(store.shopDomain, e.target.value, store.label || '')}
                   />
                 </div>
+                <div className="col-md-1 d-flex align-items-end">
+                  <button className="btn btn-sm btn-outline-danger" onClick={() => handleDisconnect(store)}>
+                    Disconnect
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -552,6 +579,21 @@ export default function Dashboard() {
                   disabled={form.customCodes}
                   onChange={(e) => setForm({ ...form, codeCount: parseInt(e.target.value) || 1 })}
                 />
+              </div>
+              <div className="col-md-5">
+                <label className="form-label">Apply To</label>
+                <select
+                  className="form-select"
+                  value={form.targetStore}
+                  onChange={(e) => setForm({ ...form, targetStore: e.target.value })}
+                >
+                  <option value="">All connected stores</option>
+                  {stores.map(store => (
+                    <option key={store.id} value={store.shopDomain}>
+                      {store.label ? `${store.label} — ` : ''}{store.shopDomain}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -833,6 +875,7 @@ export default function Dashboard() {
                     <li><strong>Minimum order:</strong> {group.minimumOrderAmount ? `$${group.minimumOrderAmount}` : 'None'}</li>
                     <li><strong>Max discount:</strong> {group.maxDiscountAmount ? `$${group.maxDiscountAmount}` : 'None'}</li>
                     <li><strong>Free shipping:</strong> {group.freeShipping ? 'Economy only' : 'No'}</li>
+                    <li><strong>Applies to:</strong> {group.targetShopDomain || 'All connected stores'}</li>
                     <li><strong>Customer selection:</strong> {group.customerSelection === 'all' ? 'All customers' : 'Specific customers'}</li>
                     <li><strong>Single item:</strong> {group.singleItem ? 'Yes (most expensive eligible item)' : 'No'}</li>
                     <li><strong>Excluded tags:</strong> {group.excludedTags && group.excludedTags.length ? group.excludedTags.join(', ') : 'None'}</li>

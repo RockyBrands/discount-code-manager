@@ -34,6 +34,7 @@ model DiscountGroup {
   minimumOrderAmount     Float?
   maxDiscountAmount      Float?
   freeShipping           Boolean        @default(false)
+  targetShopDomain       String?
   usageLimit             Int?           @default(1)
   appliesOncePerCustomer Boolean        @default(false)
   startsAt               DateTime?

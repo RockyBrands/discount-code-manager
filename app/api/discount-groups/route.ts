@@ -94,6 +94,9 @@ export async function POST(request: NextRequest) {
     const { title, discountType, discountValue, minimumOrderAmount, startsAt, endsAt, customerSelection } = body
     const singleItem = !!body.singleItem
     const freeShipping = !!body.freeShipping
+    const targetShopDomain = typeof body.targetShopDomain === 'string' && body.targetShopDomain.trim()
+      ? body.targetShopDomain.trim().toLowerCase()
+      : null
     const excludedTags = buildDiscountInput(body).excludedTags
 
     if (!title || !discountType || discountValue === undefined) {
@@ -141,9 +144,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Maximum 1000 codes allowed per group' }, { status: 400 })
     }
 
-    const shops = await prisma.shop.findMany()
+    const shops = await prisma.shop.findMany(
+      targetShopDomain ? { where: { shopDomain: targetShopDomain } } : undefined
+    )
     if (shops.length === 0) {
-      return NextResponse.json({ error: 'No connected stores' }, { status: 400 })
+      return NextResponse.json(
+        { error: targetShopDomain ? `Store not connected: ${targetShopDomain}` : 'No connected stores' },
+        { status: 400 }
+      )
     }
 
     const group = await prisma.discountGroup.create({
@@ -159,6 +167,7 @@ export async function POST(request: NextRequest) {
         excludedTags,
         maxDiscountAmount: body.maxDiscountAmount ?? null,
         freeShipping,
+        targetShopDomain,
         usageLimit: 1,
         codes: {
           createMany: { data: codes.map(code => ({ code })) },
